@@ -1,0 +1,26 @@
+{
+  "name": "jev-binaryoption",
+  "version": "0.1.0",
+  "description": "Jev - binary option direction predictor (up / down / flat after t seconds) with spread-aware decision layer, historical simulator and HTML app",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/core/index.js",
+  "exports": {
+    ".": "./src/core/index.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve": "node scripts/serve.js",
+    "build": "node scripts/build.js",
+    "sample": "node scripts/make-sample.js",
+    "sim": "node scripts/sim-cli.js",
+    "vendor": "node scripts/vendor.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

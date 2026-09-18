@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jev Binary Option Simulator</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">Jev</span>
+      <span class="subtitle">バイナリーオプション方向予測シミュレーター</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="data" class="active">1. データ</button>
+      <button data-tab="settings">2. 設定</button>
+      <button data-tab="simulation">3. シミュレーション</button>
+      <button data-tab="realtime">4. リアルタイム再生</button>
+      <button data-tab="sql">SQL (DuckDB)</button>
+      <button data-tab="help">ヘルプ</button>
+    </nav>
+    <div class="status" id="status">データ未読込</div>
+  </header>
+
+  <main>
+    <!-- ===================== データ ===================== -->
+    <section class="tab-panel active" id="tab-data">
+      <div class="grid two">
+        <div class="card">
+          <h2>ファイルを読み込む</h2>
+          <div class="dropzone" id="dropzone">
+            <p>CSV / TSV / TXT / XLSX / XLS / JSON をここにドロップ、またはクリックして選択</p>
+            <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.xlsx,.xls,.json" hidden>
+            <p class="hint">tick（timestamp, bid, ask）でもローソク足（time, open, high, low, close）でも可。列名は自動判定します。</p>
+          </div>
+          <details>
+            <summary>テキストを貼り付ける</summary>
+            <textarea id="pasteArea" rows="6" placeholder="timestamp,bid,ask&#10;2024-01-01T00:00:00Z,150.001,150.004&#10;..."></textarea>
+            <button id="pasteBtn">貼り付けたテキストを読み込む</button>
+          </details>
+        </div>
+        <div class="card">
+          <h2>サンプルデータを生成</h2>
+          <p class="hint">トレンド局面とレンジ局面が混在する合成 tick データ（bid/ask 付き）。動作確認用です。</p>
+          <div class="form-grid">
+            <label>点数 <input type="number" id="genN" value="8000" min="200" step="100"></label>
+            <label>間隔 (秒) <input type="number" id="genInterval" value="1" min="0.1" step="0.1"></label>
+            <label>初期価格 <input type="number" id="genStart" value="150" step="0.01"></label>
+            <label>1歩のボラ (対数) <input type="number" id="genVol" value="0.00005" step="0.00001"></label>
+            <label>スプレッド <input type="number" id="genSpread" value="0.003" step="0.001"></label>
+            <label>トレンド強度 <input type="number" id="genTrend" value="0.3" step="0.05"></label>
+            <label>seed <input type="number" id="genSeed" value="42" step="1"></label>
+          </div>
+          <button id="genBtn" class="primary">生成して読み込む</button>
+          <button id="loadSampleBtn">同梱サンプル CSV を読み込む</button>
+        </div>
+      </div>
+
+      <div class="card" id="mappingCard" hidden>
+        <h2>列の割り当て</h2>
+        <p class="hint" id="rawInfo"></p>
+        <div class="form-grid" id="mappingGrid"></div>
+        <div class="row">
+          <label>種類
+            <select id="kindSelect">
+              <option value="auto">自動判定</option>
+              <option value="tick">tick（1 行 = 1 価格）</option>
+              <option value="candle">ローソク足（OHLC）</option>
+            </select>
+          </label>
+          <button id="applyMappingBtn" class="primary">この割り当てで系列を作る</button>
+        </div>
+        <div class="table-wrap"><table id="previewTable"></table></div>
+      </div>
+
+      <div class="card" id="seriesCard" hidden>
+        <h2>読み込んだ系列</h2>
+        <div class="kpis" id="seriesKpis"></div>
+        <div class="row">
+          <label>ローソク足に集計
+            <select id="resampleSelect">
+              <option value="0">しない（元データのまま）</option>
+              <option value="1000">1 秒</option>
+              <option value="5000">5 秒</option>
+              <option value="10000">10 秒</option>
+              <option value="30000">30 秒</option>
+              <option value="60000">1 分</option>
+              <option value="300000">5 分</option>
+              <option value="900000">15 分</option>
+              <option value="3600000">1 時間</option>
+            </select>
+          </label>
+          <span class="hint">tick を集計すると 1 歩 = 1 バーになります。予測ホライズン t 秒はバー間隔の倍数にしてください。</span>
+        </div>
+        <canvas id="priceChart" height="260"></canvas>
+      </div>
+    </section>
+
+    <!-- ===================== 設定 ===================== -->
+    <section class="tab-panel" id="tab-settings">
+      <div class="grid two">
+        <div class="card">
+          <h2>予測の設定</h2>
+          <div class="form-grid">
+            <label>参照する過去バー数 (window)
+              <input type="number" id="cfgWindow" value="60" min="10" step="1">
+            </label>
+            <label>何秒後を予測するか (t)
+              <input type="number" id="cfgHorizon" value="60" min="1" step="1">
+            </label>
+            <label>スプレッドの扱い
+              <select id="cfgSpreadMode">
+                <option value="auto">データの bid/ask から（無ければ固定値）</option>
+                <option value="fixed">固定値を使う</option>
+              </select>
+            </label>
+            <label>固定スプレッド（価格単位）
+              <input type="number" id="cfgSpreadValue" value="0" min="0" step="0.0001">
+            </label>
+            <label>「同じ」と判定する追加帯（価格単位）
+              <input type="number" id="cfgFlat" value="0" min="0" step="0.0001">
+            </label>
+            <label>ペイアウト率 (%)
+              <input type="number" id="cfgPayout" value="85" min="1" step="1">
+            </label>
+            <label>エントリー推奨に必要な確率 (%)
+              <input type="number" id="cfgMinProb" value="55" min="0" max="100" step="1">
+            </label>
+            <label>何点ごとに予測するか (stride)
+              <input type="number" id="cfgStride" value="1" min="1" step="1">
+            </label>
+          </div>
+          <p class="hint">判定帯 = スプレッド ÷ 2 ＋ 追加帯。t 秒後の仲値がエントリー価格 ± 判定帯 を超えれば「上昇 / 下落」、収まれば「同じ」。</p>
+        </div>
+        <div class="card">
+          <h2>モデルと重み</h2>
+          <div id="modelList"></div>
+          <div class="form-grid">
+            <label>オンライン学習率
+              <input type="number" id="cfgLr" value="0.02" min="0.0001" step="0.005">
+            </label>
+          </div>
+          <p class="hint">各モデルは「期待リターン μ と不確実性 σ」を出し、重み付き平均のうえで正規分布を仮定して上昇/下落/同じの確率に変換します。</p>
+          <button id="saveCfgBtn">設定をブラウザに保存</button>
+          <button id="resetCfgBtn">初期値に戻す</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== シミュレーション ===================== -->
+    <section class="tab-panel" id="tab-simulation">
+      <div class="card">
+        <div class="row">
+          <button id="runBtn" class="primary">シミュレーション実行</button>
+          <button id="cancelBtn" hidden>中止</button>
+          <progress id="progress" value="0" max="1" hidden></progress>
+          <span id="simInfo" class="hint"></span>
+          <span class="spacer"></span>
+          <button id="exportCsvBtn" disabled>結果 CSV</button>
+          <button id="exportJsonBtn" disabled>結果 JSON</button>
+        </div>
+      </div>
+      <div id="results" hidden>
+        <div class="kpis" id="simKpis"></div>
+        <div class="grid two">
+          <div class="card">
+            <h3>累積損益（掛け金 1 / 取引）</h3>
+            <canvas id="equityChart" height="220"></canvas>
+          </div>
+          <div class="card">
+            <h3>価格と予測（緑=的中, 赤=外れ, 灰=見送り）</h3>
+            <canvas id="simPriceChart" height="220"></canvas>
+            <div class="row">
+              <label>表示範囲 <input type="range" id="simRange" min="0" max="100" value="0"></label>
+              <label>幅 <input type="number" id="simSpan" value="600" min="50" step="50"></label>
+            </div>
+          </div>
+        </div>
+        <div class="grid three">
+          <div class="card">
+            <h3>混同行列（行=予測, 列=結果）</h3>
+            <table id="confusionTable" class="compact"></table>
+          </div>
+          <div class="card">
+            <h3>確率の較正（確信度 vs 的中率）</h3>
+            <table id="calibrationTable" class="compact"></table>
+          </div>
+          <div class="card">
+            <h3>モデル別 方向的中率</h3>
+            <table id="partsTable" class="compact"></table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>予測ログ（末尾 300 件）</h3>
+          <div class="table-wrap"><table id="recordsTable" class="compact"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== リアルタイム再生 ===================== -->
+    <section class="tab-panel" id="tab-realtime">
+      <div class="card">
+        <div class="row">
+          <button id="rtPlayBtn" class="primary">▶ 再生</button>
+          <button id="rtStepBtn">1 点進める</button>
+          <button id="rtResetBtn">リセット</button>
+          <label>速度（点/秒） <input type="number" id="rtSpeed" value="20" min="1" max="2000"></label>
+          <label>開始位置 <input type="number" id="rtStart" value="0" min="0" step="1"></label>
+          <span id="rtInfo" class="hint"></span>
+        </div>
+        <p class="hint">読み込んだ系列を 1 点ずつ流し込み、RealtimeSession が返す最新予測を表示します。Chrome 拡張 / API 接続時も同じ API を使います。</p>
+      </div>
+      <div class="grid two">
+        <div class="card live" id="liveCard">
+          <div class="live-dir" id="liveDir">—</div>
+          <div class="live-price" id="livePrice"></div>
+          <div class="prob-bars">
+            <div class="prob up"><span>上昇</span><div class="bar"><i id="barUp"></i></div><b id="pUp">–</b></div>
+            <div class="prob flat"><span>同じ</span><div class="bar"><i id="barFlat"></i></div><b id="pFlat">–</b></div>
+            <div class="prob down"><span>下落</span><div class="bar"><i id="barDown"></i></div><b id="pDown">–</b></div>
+          </div>
+          <div class="kpis small" id="liveKpis"></div>
+        </div>
+        <div class="card">
+          <h3>直近の価格と予測</h3>
+          <canvas id="rtChart" height="220"></canvas>
+          <h3>成績（解決済み）</h3>
+          <div class="kpis small" id="rtStats"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>解決ログ（新しい順、50 件）</h3>
+        <div class="table-wrap"><table id="rtLog" class="compact"></table></div>
+      </div>
+    </section>
+
+    <!-- ===================== SQL ===================== -->
+    <section class="tab-panel" id="tab-sql">
+      <div class="card">
+        <h2>DuckDB-wasm で前処理（任意）</h2>
+        <p class="hint">読み込んだ生データを <code>prices</code> テーブルとして DuckDB に登録し、SQL で絞り込み・変換した結果を系列として使います。DuckDB は初回に CDN (jsDelivr) から読み込むためネット接続が必要です。</p>
+        <div class="row">
+          <button id="duckLoadBtn">DuckDB を読み込む</button>
+          <span id="duckStatus" class="hint">未読込</span>
+        </div>
+        <textarea id="sqlArea" rows="6">SELECT * FROM prices ORDER BY 1 LIMIT 100000</textarea>
+        <div class="row">
+          <button id="sqlRunBtn" class="primary" disabled>実行して結果を系列にする</button>
+          <button id="sqlPreviewBtn" disabled>プレビューのみ</button>
+          <span id="sqlInfo" class="hint"></span>
+        </div>
+        <div class="table-wrap"><table id="sqlTable" class="compact"></table></div>
+      </div>
+    </section>
+
+    <!-- ===================== ヘルプ ===================== -->
+    <section class="tab-panel" id="tab-help">
+      <div class="card prose">
+        <h2>使い方</h2>
+        <ol>
+          <li><b>データ</b>タブで過去の価格データ（CSV / Excel / JSON）を読み込むか、サンプルを生成します。列名は自動判定され、必要なら手動で割り当てを直せます。</li>
+          <li><b>設定</b>タブで「参照する過去バー数」「何秒後を予測するか (t)」「スプレッド」「ペイアウト率」「使用モデル」を決めます。</li>
+          <li><b>シミュレーション</b>タブで実行すると、系列の先頭から順に予測を出し、t 秒後の実際の価格で「上昇 / 下落 / 同じ」を判定して集計します。オンライン学習モデルは結果が判明した時点で更新されます（未来の情報は使いません）。</li>
+          <li><b>リアルタイム再生</b>タブでは同じ系列を 1 点ずつ流し、リアルタイム運用時と同じ API（RealtimeSession）の出力を確認できます。</li>
+        </ol>
+        <h3>出力の意味</h3>
+        <ul>
+          <li><b>pUp / pDown / pFlat</b>: t 秒後に価格が判定帯を超えて上がる / 下がる / 帯内に収まる確率。</li>
+          <li><b>予想価格</b>: 仲値 × exp(μ)。μ は各モデルの期待対数リターンの重み付き平均。</li>
+          <li><b>EV</b>: 推奨方向でエントリーした場合の掛け金 1 あたりの期待値 = p × ペイアウト率 − (1 − p)。</li>
+          <li><b>エントリー推奨</b>: 方向が flat でなく、確率が閾値以上かつ EV ≥ 0 のとき。</li>
+        </ul>
+        <h3>注意</h3>
+        <p>本ツールは過去データに対する検証用です。合成データや短い期間での好成績は将来の収益を保証しません。実口座で使う前に、十分な期間の実データで、スプレッドと判定ルールを業者に合わせて検証してください。</p>
+        <p>詳細はリポジトリの <code>docs/</code> を参照してください。</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

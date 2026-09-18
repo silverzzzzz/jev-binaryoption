@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>Jev</title>
+  <style>
+    body { font-family: system-ui, sans-serif; font-size: 13px; margin: 12px; color: #e6edf3; background: #0f1419; }
+    label { display: block; margin: 6px 0; color: #8b98a8; }
+    input { width: 100%; box-sizing: border-box; background: #1f2731; color: #e6edf3; border: 1px solid #2a3441; border-radius: 4px; padding: 4px 6px; }
+    button { background: #4f8ff7; color: #fff; border: 0; border-radius: 4px; padding: 6px 10px; margin-top: 6px; cursor: pointer; }
+    .dir { font-size: 40px; font-weight: 800; text-align: center; margin: 10px 0; }
+    .up { color: #22c55e; } .down { color: #ef4444; } .flat { color: #9ca3af; }
+    .row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #2a3441; }
+    details { margin-top: 10px; }
+    .muted { color: #8b98a8; }
+  </style>
+</head>
+<body>
+  <div class="dir flat" id="dir">—</div>
+  <div class="row"><span>仲値</span><b id="mid">–</b></div>
+  <div class="row"><span>予想価格 (t 秒後)</span><b id="exp">–</b></div>
+  <div class="row"><span>上昇 / 同じ / 下落</span><b id="probs">–</b></div>
+  <div class="row"><span>EV</span><b id="ev">–</b></div>
+  <div class="row"><span>推奨</span><b id="trade">–</b></div>
+  <div class="row"><span>成績 (解決済み)</span><b id="stats">–</b></div>
+  <div class="muted" id="info">tick 待ち…（下の設定でセレクタを指定）</div>
+  <details open>
+    <summary>設定</summary>
+    <label>Bid セレクタ <input id="selBid" placeholder=".bid"></label>
+    <label>Ask セレクタ <input id="selAsk" placeholder=".ask"></label>
+    <label>単一価格セレクタ（bid/ask が無い場合） <input id="selPrice" placeholder=".rate"></label>
+    <label>ポーリング間隔 (ms) <input id="selInterval" type="number" value="250"></label>
+    <label>参照バー数 <input id="cfgWindow" type="number" value="60"></label>
+    <label>t 秒後 <input id="cfgHorizon" type="number" value="60"></label>
+    <label>固定スプレッド（bid/ask 無し時） <input id="cfgSpread" type="number" value="0" step="0.0001"></label>
+    <label>ペイアウト率 (%) <input id="cfgPayout" type="number" value="85"></label>
+    <label>推奨に必要な確率 (%) <input id="cfgMinProb" type="number" value="55"></label>
+    <button id="save">保存して開始</button>
+  </details>
+  <script src="jev-core.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

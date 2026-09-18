@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Jev Binary Option Predictor",
+  "version": "0.1.0",
+  "description": "ページ上の価格表示を読み取り、t 秒後に上がる / 下がる / 同じ をリアルタイム予測する（実験的）",
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "action": { "default_title": "Jev を開く" },
+  "side_panel": { "default_path": "panel.html" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" }
+  ]
+}
