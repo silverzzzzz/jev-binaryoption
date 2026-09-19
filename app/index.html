@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jev Binary Option Simulator</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -54,6 +55,42 @@
           </div>
           <button id="genBtn" class="primary">生成して読み込む</button>
           <button id="loadSampleBtn">同梱サンプル CSV を読み込む</button>
+        </div>
+        <div class="card">
+          <h2>オンラインから実データを取得</h2>
+          <p class="hint">API キー不要の公開 API から取得します。bid/ask は含まれないため、設定タブで固定スプレッドを指定してください。</p>
+          <div class="form-grid">
+            <label>提供元 <select id="dlSource"></select></label>
+            <label>銘柄 <input type="text" id="dlSymbol" value="BTCUSDT"></label>
+            <label>種別
+              <select id="dlKind">
+                <option value="candle">ローソク足</option>
+                <option value="tick">tick（約定）</option>
+              </select>
+            </label>
+            <label>間隔 <select id="dlInterval"></select></label>
+            <label>期間
+              <select id="dlSpan">
+                <option value="1">1 時間</option>
+                <option value="6">6 時間</option>
+                <option value="24" selected>1 日</option>
+                <option value="72">3 日</option>
+                <option value="168">7 日</option>
+              </select>
+            </label>
+            <label>最大行数 <input type="number" id="dlLimit" value="200000" min="100" step="1000"></label>
+          </div>
+          <div class="row">
+            <button id="dlBtn" class="primary">取得して読み込む</button>
+            <button id="dlCancelBtn" hidden>中止</button>
+            <button id="dlSaveBtn" disabled>CSV として保存</button>
+            <span id="dlInfo" class="hint"></span>
+          </div>
+          <p class="hint" id="dlNote"></p>
+          <details>
+            <summary>詳細設定</summary>
+            <label>API ベース URL（検証用。空欄で既定）<input type="text" id="dlBase" placeholder="https://api.binance.com"></label>
+          </details>
         </div>
       </div>
 

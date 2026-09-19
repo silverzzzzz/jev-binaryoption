@@ -4,6 +4,8 @@ import {
 } from '../src/core/index.js';
 import { drawChart } from './chart.js';
 import { readFile, parseText, loadDuckDb, duckRegister, duckQuery } from './importers.js';
+import { SOURCES } from '../src/tools/sources.js';
+import { fetchSeries, makeHttpGet } from '../src/tools/fetchClient.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (v, d = 4) => (Number.isFinite(v) ? v.toFixed(d) : '–');
@@ -140,6 +142,83 @@ $('loadSampleBtn').onclick = async () => {
   } catch (err) {
     toast('サンプルを取得できません（npm run serve で起動してください）: ' + err.message, true);
   }
+};
+
+// ---------------- オンライン取得 ----------------
+function buildSourceSelect() {
+  const sel = $('dlSource');
+  sel.innerHTML = Object.entries(SOURCES)
+    .map(([id, s]) => `<option value="${id}"${s.browser ? '' : ' disabled'}>${s.label}${s.browser ? '' : '（CLI のみ）'}</option>`)
+    .join('');
+  sel.value = 'binance';
+  onSourceChange();
+}
+function onSourceChange() {
+  const s = SOURCES[$('dlSource').value];
+  $('dlSymbol').value = s.symbolExample;
+  $('dlNote').textContent = s.note;
+  const kindSel = $('dlKind');
+  kindSel.innerHTML = s.kinds.map((k) => `<option value="${k}">${k === 'tick' ? 'tick（約定）' : 'ローソク足'}</option>`).join('');
+  onKindChange();
+}
+function onKindChange() {
+  const s = SOURCES[$('dlSource').value];
+  const isTick = $('dlKind').value === 'tick';
+  const iv = $('dlInterval');
+  iv.innerHTML = s.intervals.map((i) => `<option value="${i}">${/^\d+$/.test(i) ? i + ' 分' : i}</option>`).join('');
+  iv.value = s.intervals.includes('1m') ? '1m' : s.intervals[0] || '';
+  iv.disabled = isTick || !s.intervals.length;
+}
+$('dlSource').onchange = onSourceChange;
+$('dlKind').onchange = onKindChange;
+buildSourceSelect();
+
+let dlCancel = false;
+let lastDownload = null;
+$('dlCancelBtn').onclick = () => { dlCancel = true; };
+$('dlBtn').onclick = async () => {
+  const source = $('dlSource').value;
+  const tick = $('dlKind').value === 'tick';
+  const hours = Number($('dlSpan').value) || 24;
+  const endTime = Date.now();
+  dlCancel = false;
+  $('dlBtn').disabled = true;
+  $('dlCancelBtn').hidden = false;
+  $('dlInfo').textContent = '取得中…';
+  try {
+    const res = await fetchSeries({
+      source,
+      symbol: $('dlSymbol').value.trim(),
+      tick,
+      interval: $('dlInterval').value,
+      startTime: endTime - hours * 3600000,
+      endTime,
+      maxRows: Number($('dlLimit').value) || 200000,
+      base: $('dlBase').value.trim() || undefined,
+      get: makeHttpGet({ onRetry: (m) => { $('dlInfo').textContent = m; } }),
+      onProgress: (rows, lastTime) => {
+        $('dlInfo').textContent = `${rows.toLocaleString()} 行 (${formatTime(lastTime)} まで)`;
+      },
+      cancelled: () => dlCancel,
+    });
+    if (!res.rows.length) throw new Error('0 行でした。銘柄名や期間を確認してください。');
+    lastDownload = { ...res, source, symbol: $('dlSymbol').value.trim(), tick };
+    $('dlSaveBtn').disabled = false;
+    $('dlInfo').textContent = `${res.rows.length.toLocaleString()} 行を取得${dlCancel ? '（中止）' : ''}`;
+    if (res.note) $('dlNote').textContent = res.note;
+    setRaw({ header: res.header, rows: res.rows, source: `${SOURCES[source].label} ${$('dlSymbol').value.trim()}` });
+    if (!SOURCES[source].hasSpread) $('dlNote').textContent = 'このデータには bid/ask が含まれません。設定タブで「固定スプレッド」に実際の値を入力してください。';
+  } catch (err) {
+    $('dlInfo').textContent = '失敗: ' + err.message;
+  } finally {
+    $('dlBtn').disabled = false;
+    $('dlCancelBtn').hidden = true;
+  }
+};
+$('dlSaveBtn').onclick = () => {
+  if (!lastDownload) return;
+  const d = lastDownload;
+  download(`${d.source}_${d.symbol.replace(/[^\w.-]/g, '')}_${d.tick ? 'tick' : 'candle'}.csv`, toCsv(d.header, d.rows), 'text/csv');
 };
 
 async function loadFile(file) {

@@ -15,6 +15,7 @@
 | `npm run build` | `dist/jev-sim.html`（単一 HTML）、`dist/jev-core.js`（グローバル `Jev`）、`dist/extension/` を生成 |
 | `npm run vendor` | SheetJS を `app/vendor/` にコピー（オフラインで Excel を読む場合） |
 | `npm run sample` | `samples/*.csv` を再生成 |
+| `npm run fetch -- --source binance --symbol BTCUSDT --days 1` | 公開 API から実データを取得（[docs/data-sources.md](data-sources.md)） |
 | `npm run sim -- <file> [opts]` | CLI シミュレーション（`node scripts/sim-cli.js` と同じ） |
 
 ## コードスタイル
@@ -33,6 +34,15 @@ import assert from 'node:assert/strict';
 import { decide } from '../src/core/index.js';
 test('example', () => { assert.ok(decide({ mu: 0, sigma: 1, mid: 100, spread: 0 }).pFlat < 1e-6); });
 ```
+
+## データ取得スクリプトのテスト
+
+`test/fetch-data.test.js` はローカルのモック HTTP サーバーを立てて `scripts/fetch-data.js` を
+子プロセスとして実行し、ページング・カーソル処理・429 リトライ・出力 CSV を検証します。
+外部ネットワークには接続しないため、オフラインでも実行できます。
+
+提供元を追加するときは、`src/tools/sources.js` に URL 組み立てと応答変換の**純粋関数**を書き、
+`test/sources.test.js` にその提供元の応答形式を模したフィクスチャでテストを足してください。
 
 ## ブラウザでの動作確認
 

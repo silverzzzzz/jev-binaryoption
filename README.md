@@ -52,6 +52,32 @@ node scripts/sim-cli.js samples/sample_ticks.csv --horizon 30 --window 60 --payo
 node scripts/sim-cli.js samples/sample_candles_m1.csv --horizon 300 --window 30 --out result.json
 ```
 
+## 実データを無料で取得する
+
+アプリの**データ**タブにある「オンラインから実データを取得」から、Binance / Kraken / bitFlyer の
+実データを直接読み込めます（APIキー不要）。CLI からも取得できます（`data/` に CSV を保存）。
+
+```bash
+node scripts/fetch-data.js --source binance --symbol BTCUSDT --interval 1s --days 1
+node scripts/fetch-data.js --source yahoo   --symbol USDJPY=X --interval 1m --days 7
+node scripts/fetch-data.js --source bitflyer --symbol BTC_JPY --tick --hours 1
+node scripts/fetch-data.js --help          # 提供元とオプションの一覧
+```
+
+これらのデータには bid/ask が含まれないため、検証時は実際のスプレッドを指定してください。
+
+```bash
+node scripts/sim-cli.js data/binance_BTCUSDT_candle_1s_1d.csv --horizon 60 --spread 2
+```
+
+FX の **bid/ask 付き tick**（バイナリーオプションの検証にはこちらが適切）は Dukascopy から取得できます。
+
+```bash
+npx dukascopy-node@latest -i eurusd -from 2024-01-02 -to 2024-01-03 -t tick -f csv
+```
+
+提供元の一覧、銘柄名の書式、利用上の注意は [docs/data-sources.md](docs/data-sources.md) を参照してください。
+
 ## コアをコードから使う
 
 ```js
@@ -85,7 +111,8 @@ src/core/            予測エンジン（依存なし ESM）
   synthetic.js       合成データ生成
 app/                 HTML アプリ（index.html, app.js, chart.js, importers.js, styles.css）
 extension/           Chrome 拡張の雛形（実験的）
-scripts/             serve / build / sample 生成 / CLI シミュレーション / vendor
+src/tools/sources.js 無料データ提供元ごとの URL 組み立てと応答の変換
+scripts/             serve / build / sample 生成 / データ取得 / CLI シミュレーション / vendor
 samples/             サンプル CSV（tick と MT 形式 1 分足）
 test/                node:test によるユニットテスト
 docs/                設計ドキュメント
@@ -95,6 +122,7 @@ docs/                設計ドキュメント
 
 - [docs/architecture.md](docs/architecture.md) — 全体構成とデータフロー
 - [docs/data-format.md](docs/data-format.md) — 対応するファイル形式・列名・時刻形式
+- [docs/data-sources.md](docs/data-sources.md) — 無料で価格データを入手する方法
 - [docs/prediction-model.md](docs/prediction-model.md) — 予測モデルとスプレッドを含む判定ロジック
 - [docs/simulation.md](docs/simulation.md) — シミュレーションの仕組みと指標の読み方
 - [docs/roadmap.md](docs/roadmap.md) — Chrome 拡張 / 専用ブラウザ / API トレードへの道筋

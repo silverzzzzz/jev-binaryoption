@@ -10,9 +10,9 @@
 ## データフロー
 
 ```
-ファイル (CSV/TSV/XLSX/JSON)      DuckDB-wasm (任意)
-        │ importers.js                 │ SQL → 行
-        ▼                              ▼
+ファイル (CSV/TSV/XLSX/JSON)   公開 API (src/tools)   DuckDB-wasm (任意)
+        │ importers.js            │ fetchSeries()        │ SQL → 行
+        ▼                         ▼                      ▼
    {header, rows}  ──── detectColumns / buildSeries ────▶ Series {kind, data[]}
                                                               │ toCandleSeries (任意: tick → 足)
                                                               ▼
@@ -62,6 +62,8 @@ buffer (直近 windowBars × 2 点)
 | `app/app.js` | UI コントローラ（タブ、設定の永続化、シミュレーション実行、再生） |
 | `app/chart.js` | canvas チャート |
 | `app/importers.js` | ファイル読み込み、SheetJS / DuckDB-wasm の遅延ロード |
+| `src/tools/sources.js` | 無料データ提供元ごとの URL 組み立てと応答変換（純粋関数） |
+| `src/tools/fetchClient.js` | ページング / カーソル処理と HTTP リトライ。CLI とブラウザで共用 |
 
 ## 将来の拡張ポイント
 

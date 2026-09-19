@@ -57,6 +57,11 @@
 ホライズン t 秒はバー間隔の倍数にしてください（例: 1 分足なら t = 60, 120, 300 …）。
 ローソク足を tick より小さい間隔にはできません。
 
+## 実データの入手
+
+無料で価格データを取得する方法（同梱スクリプト、Dukascopy の bid/ask 付き tick など）は
+[data-sources.md](data-sources.md) にまとめています。
+
 ## 同梱サンプル
 
 - `samples/sample_ticks.csv` — `timestamp,bid,ask` の 1 秒 tick（合成、約 3.3 時間）
